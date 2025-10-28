@@ -275,3 +275,85 @@ func listenOne() (func(), *net.TCPAddr, error) {
 	}
 	return closer, addr, nil
 }
+
+func TestNewH2CTransport(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Create server with H2C (HTTP/2 cleartext) support
+	protocols := &http.Protocols{}
+	protocols.SetUnencryptedHTTP2(true)
+
+	server := httptest.NewUnstartedServer(handler)
+	server.Config.Protocols = protocols
+	server.Start()
+	defer server.Close()
+
+	// Create H2C transport
+	transport := newH2CTransport(false)
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	// Make request to the H2C-enabled server
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatalf("Request to H2C server failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	if resp.Proto != "HTTP/2.0" {
+		t.Errorf("Expected protocol HTTP/2.0, got %s", resp.Proto)
+	}
+}
+
+func TestNewH2Transport(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	// Create TLS server with HTTP/2 support
+	server := httptest.NewUnstartedServer(handler)
+	server.EnableHTTP2 = true
+	server.StartTLS()
+	defer server.Close()
+
+	// Create TLS context function using server's certificate
+	rootCAs := x509.NewCertPool()
+	rootCAs.AddCert(server.Certificate())
+	tlsConfig := &tls.Config{
+		RootCAs:    rootCAs,
+		NextProtos: []string{"h2"}, // Ensure HTTP/2 is negotiated
+	}
+
+	tlsContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		d := tls.Dialer{Config: tlsConfig}
+		return d.DialContext(ctx, network, addr)
+	}
+
+	// Create H2 transport
+	transport := newH2Transport(false, tlsContext)
+	client := &http.Client{
+		Transport: transport,
+	}
+
+	// Make HTTPS request
+	resp, err := client.Get(server.URL)
+	if err != nil {
+		t.Fatalf("Request to H2 server failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", resp.StatusCode)
+	}
+
+	if resp.Proto != "HTTP/2.0" {
+		t.Errorf("Expected protocol HTTP/2.0, got %s", resp.Proto)
+	}
+}

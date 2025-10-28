@@ -142,12 +142,40 @@ func newHTTPSTransport(disableKeepAlives, disableCompression bool, maxIdle, maxI
 	return transport
 }
 
+// newH2CTransport creates an http.RoundTripper that only supports h2c (HTTP2 cleartext).
+func newH2CTransport(disableCompression bool) http.RoundTripper {
+	protocols := &http.Protocols{}
+	protocols.SetUnencryptedHTTP2(true)
+
+	return &http.Transport{
+		DisableCompression: disableCompression,
+		DialTLSContext: func(ctx context.Context, netw, addr string) (net.Conn, error) {
+			return DialWithBackOff(ctx, netw, addr)
+		},
+		Protocols: protocols,
+	}
+}
+
+// newH2Transport creates an http.RoundTripper that only supports h2 (encrypted HTTP2).
+func newH2Transport(disableCompression bool, tlsContext DialTLSContextFunc) http.RoundTripper {
+	protocols := &http.Protocols{}
+	protocols.SetHTTP2(true)
+
+	return &http.Transport{
+		DisableCompression: disableCompression,
+		DialTLSContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return tlsContext(ctx, network, addr)
+		},
+		Protocols: protocols,
+	}
+}
+
 // NewProberTransport creates a RoundTripper that is useful for probing,
 // since it will not cache connections.
 func NewProberTransport() http.RoundTripper {
 	return newAutoTransport(
 		newHTTPTransport(true /*disable keep-alives*/, false /*disable auto-compression*/, 0, 0 /*no caching*/),
-		NewH2CTransport())
+		newH2CTransport(false /*disable auto-compression*/))
 }
 
 // NewProxyAutoTLSTransport is same with NewProxyAutoTransport but it has DialTLSContextFunc to create HTTPS request.
