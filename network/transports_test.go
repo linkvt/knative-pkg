@@ -104,7 +104,7 @@ func TestDialTLSWithBackoffSuccess(t *testing.T) {
 	testDialWithBackoffSuccess(exampleTLSConf(), t)
 }
 
-func testDialWithBackoffConnectionRefused(tlsConf *tls.Config, t testingT) {
+func testDialWithBackoffConnectionRefused(tlsConf *tls.Config, t testing.TB) {
 	ctx := context.TODO()
 	port := findUnusedPortOrFail(t)
 	addr := fmt.Sprintf("127.0.0.1:%d", port)
@@ -116,7 +116,7 @@ func testDialWithBackoffConnectionRefused(tlsConf *tls.Config, t testingT) {
 	}
 }
 
-func testDialWithBackoffTimeout(tlsConf *tls.Config, t testingT) {
+func testDialWithBackoffTimeout(tlsConf *tls.Config, t testing.TB) {
 	ctx := context.TODO()
 	closer, addr, err := listenOne()
 	if err != nil {
@@ -157,7 +157,7 @@ func testDialWithBackoffTimeout(tlsConf *tls.Config, t testingT) {
 	}
 }
 
-func testDialWithBackoffSuccess(tlsConf *tls.Config, t testingT) {
+func testDialWithBackoffSuccess(tlsConf *tls.Config, t testing.TB) {
 	//goland:noinspection HttpUrlsUsage
 	const (
 		prefixHTTP  = "http://"
@@ -218,7 +218,7 @@ func newDialer(ctx context.Context, tlsConf *tls.Config) func(addr string) (net.
 	return dialFn
 }
 
-func closeOrFail(t testingT, con io.Closer) {
+func closeOrFail(t testing.TB, con io.Closer) {
 	if con == nil {
 		return
 	}
@@ -227,7 +227,7 @@ func closeOrFail(t testingT, con io.Closer) {
 	}
 }
 
-func findUnusedPortOrFail(t testingT) int {
+func findUnusedPortOrFail(t testing.TB) int {
 	l, err := net.Listen("tcp", "localhost:0")
 	if err != nil {
 		t.Fatal(err)
@@ -274,9 +274,4 @@ func listenOne() (func(), *net.TCPAddr, error) {
 		Port: sa.Port,
 	}
 	return closer, addr, nil
-}
-
-type testingT interface {
-	Fatal(args ...interface{})
-	Fatalf(format string, args ...interface{})
 }
